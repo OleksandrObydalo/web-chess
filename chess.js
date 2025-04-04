@@ -30,6 +30,15 @@ class ChessGame {
     this.possibleMoves = [];
     this.inCheck = false;
     this.gameOver = false;
+    // Track if pieces have moved (for castling)
+    this.pieceMoved = {
+      whiteKing: false,
+      blackKing: false,
+      whiteRookKingside: false,
+      whiteRookQueenside: false,
+      blackRookKingside: false,
+      blackRookQueenside: false
+    };
     
     this.initBoard();
     this.setupEventListeners();
@@ -425,6 +434,101 @@ class ChessGame {
         }
       }
     }
+    
+    // Add castling moves if not in check and not checkOnly
+    if (!checkOnly && !this.inCheck) {
+      this.addCastlingMoves(row, col, color, moves);
+    }
+  }
+
+  addCastlingMoves(row, col, color, moves) {
+    // Kingside castling (O-O)
+    const kingsideEmpty = this.checkCastlingPath(row, col, true);
+    const kingsideSafe = this.isCastlingPathSafe(row, col, true);
+    
+    if (color === 'WHITE' && !this.pieceMoved.whiteKing && !this.pieceMoved.whiteRookKingside && kingsideEmpty && kingsideSafe) {
+      moves.push({ row: row, col: col + 2 });
+    } else if (color === 'BLACK' && !this.pieceMoved.blackKing && !this.pieceMoved.blackRookKingside && kingsideEmpty && kingsideSafe) {
+      moves.push({ row: row, col: col + 2 });
+    }
+    
+    // Queenside castling (O-O-O)
+    const queensideEmpty = this.checkCastlingPath(row, col, false);
+    const queensideSafe = this.isCastlingPathSafe(row, col, false);
+    
+    if (color === 'WHITE' && !this.pieceMoved.whiteKing && !this.pieceMoved.whiteRookQueenside && queensideEmpty && queensideSafe) {
+      moves.push({ row: row, col: col - 2 });
+    } else if (color === 'BLACK' && !this.pieceMoved.blackKing && !this.pieceMoved.blackRookQueenside && queensideEmpty && queensideSafe) {
+      moves.push({ row: row, col: col - 2 });
+    }
+  }
+
+  checkCastlingPath(row, col, kingside) {
+    if (kingside) {
+      // Check if squares between king and kingside rook are empty
+      return !this.board[row][col + 1] && !this.board[row][col + 2];
+    } else {
+      // Check if squares between king and queenside rook are empty
+      return !this.board[row][col - 1] && !this.board[row][col - 2] && !this.board[row][col - 3];
+    }
+  }
+
+  isCastlingPathSafe(row, col, kingside) {
+    const opponentColor = this.currentPlayer === 'WHITE' ? 'BLACK' : 'WHITE';
+    
+    // Check if any of the squares in the castling path are under attack
+    if (kingside) {
+      return !this.isSquareUnderAttack(row, col, opponentColor) && 
+             !this.isSquareUnderAttack(row, col + 1, opponentColor) && 
+             !this.isSquareUnderAttack(row, col + 2, opponentColor);
+    } else {
+      return !this.isSquareUnderAttack(row, col, opponentColor) && 
+             !this.isSquareUnderAttack(row, col - 1, opponentColor) && 
+             !this.isSquareUnderAttack(row, col - 2, opponentColor);
+    }
+  }
+
+  isSquareUnderAttack(row, col, attackerColor) {
+    // Check for attacks from all opponent's pieces
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const piece = this.board[r][c];
+        if (piece && piece.color === attackerColor) {
+          const moves = [];
+          
+          switch (piece.type) {
+            case 'PAWN':
+              this.calculatePawnAttacks(r, c, attackerColor, moves);
+              break;
+            case 'ROOK':
+              this.calculateRookMoves(r, c, attackerColor, moves, true);
+              break;
+            case 'KNIGHT':
+              this.calculateKnightMoves(r, c, attackerColor, moves, true);
+              break;
+            case 'BISHOP':
+              this.calculateBishopMoves(r, c, attackerColor, moves, true);
+              break;
+            case 'QUEEN':
+              this.calculateRookMoves(r, c, attackerColor, moves, true);
+              this.calculateBishopMoves(r, c, attackerColor, moves, true);
+              break;
+            case 'KING':
+              this.calculateKingMoves(r, c, attackerColor, moves, true);
+              break;
+          }
+          
+          // Check if any of these moves target the square we're checking
+          for (const move of moves) {
+            if (move.row === row && move.col === col) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    
+    return false;
   }
 
   isInBounds(row, col) {
@@ -455,6 +559,44 @@ class ChessGame {
   makeMove(startRow, startCol, endRow, endCol) {
     const movingPiece = this.board[startRow][startCol];
     const capturedPiece = this.board[endRow][endCol];
+    
+    // Check for castling move
+    if (movingPiece.type === 'KING') {
+      // Update king moved status
+      if (movingPiece.color === 'WHITE') {
+        this.pieceMoved.whiteKing = true;
+      } else {
+        this.pieceMoved.blackKing = true;
+      }
+      
+      // Check for kingside castling (2 columns to the right)
+      if (endCol - startCol === 2) {
+        // Move the rook as well
+        const rookCol = 7;
+        const rookRow = startRow;
+        this.board[rookRow][endCol - 1] = this.board[rookRow][rookCol];
+        this.board[rookRow][rookCol] = null;
+      }
+      // Check for queenside castling (2 columns to the left)
+      else if (startCol - endCol === 2) {
+        // Move the rook as well
+        const rookCol = 0;
+        const rookRow = startRow;
+        this.board[rookRow][endCol + 1] = this.board[rookRow][rookCol];
+        this.board[rookRow][rookCol] = null;
+      }
+    }
+    
+    // Update rook moved status (for castling)
+    if (movingPiece.type === 'ROOK') {
+      if (movingPiece.color === 'WHITE') {
+        if (startCol === 0) this.pieceMoved.whiteRookQueenside = true;
+        if (startCol === 7) this.pieceMoved.whiteRookKingside = true;
+      } else {
+        if (startCol === 0) this.pieceMoved.blackRookQueenside = true;
+        if (startCol === 7) this.pieceMoved.blackRookKingside = true;
+      }
+    }
     
     // Update the board
     this.board[endRow][endCol] = movingPiece;
@@ -563,6 +705,15 @@ class ChessGame {
     this.possibleMoves = [];
     this.inCheck = false;
     this.gameOver = false;
+    // Reset castling tracking
+    this.pieceMoved = {
+      whiteKing: false,
+      blackKing: false,
+      whiteRookKingside: false,
+      whiteRookQueenside: false,
+      blackRookKingside: false,
+      blackRookQueenside: false
+    };
     this.turnIndicator.textContent = "White's turn";
     this.statusMessage.textContent = "";
     this.clearHighlights();
@@ -574,4 +725,3 @@ class ChessGame {
 document.addEventListener('DOMContentLoaded', () => {
   new ChessGame();
 });
-
