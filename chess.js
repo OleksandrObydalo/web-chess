@@ -40,6 +40,10 @@ class ChessGame {
       blackRookQueenside: false
     };
     
+    // Add move history tracking
+    this.moveHistory = new MoveHistory();
+    this.moveHistory.onRestoreState = (moves) => this.restoreGameFromHistory(moves);
+    
     this.initBoard();
     this.setupEventListeners();
   }
@@ -620,6 +624,59 @@ class ChessGame {
     
     // Check if the opponent is in check or checkmate
     this.checkGameState();
+    
+    // Record the move in move history
+    this.moveHistory.addMove({
+      startRow, 
+      startCol, 
+      endRow, 
+      endCol,
+      piece: PIECES[movingPiece.color][movingPiece.type],
+      capturedPiece: capturedPiece ? PIECES[capturedPiece.color][capturedPiece.type] : null
+    });
+  }
+
+  restoreGameFromHistory(moves) {
+    // Reset the game to initial state
+    this.resetGame();
+
+    // Replay moves up to the specified point
+    for (const move of moves) {
+      this.board[move.endRow][move.endCol] = this.board[move.startRow][move.startCol];
+      this.board[move.startRow][move.startCol] = null;
+      
+      // Switch players
+      this.currentPlayer = this.currentPlayer === 'WHITE' ? 'BLACK' : 'WHITE';
+    }
+
+    // Update the board view
+    this.updateBoardView();
+    this.turnIndicator.textContent = `${this.currentPlayer.charAt(0) + this.currentPlayer.slice(1).toLowerCase()}'s turn`;
+  }
+
+  resetGame() {
+    // Reset move history
+    this.moveHistory.reset();
+    
+    this.board = this.createInitialBoard();
+    this.currentPlayer = 'WHITE';
+    this.selectedPiece = null;
+    this.possibleMoves = [];
+    this.inCheck = false;
+    this.gameOver = false;
+    // Reset castling tracking
+    this.pieceMoved = {
+      whiteKing: false,
+      blackKing: false,
+      whiteRookKingside: false,
+      whiteRookQueenside: false,
+      blackRookKingside: false,
+      blackRookQueenside: false
+    };
+    this.turnIndicator.textContent = "White's turn";
+    this.statusMessage.textContent = "";
+    this.clearHighlights();
+    this.updateBoardView();
   }
 
   checkGameState() {
@@ -696,28 +753,6 @@ class ChessGame {
 
   getSquareElement(row, col) {
     return document.querySelector(`.square[data-row="${row}"][data-col="${col}"]`);
-  }
-
-  resetGame() {
-    this.board = this.createInitialBoard();
-    this.currentPlayer = 'WHITE';
-    this.selectedPiece = null;
-    this.possibleMoves = [];
-    this.inCheck = false;
-    this.gameOver = false;
-    // Reset castling tracking
-    this.pieceMoved = {
-      whiteKing: false,
-      blackKing: false,
-      whiteRookKingside: false,
-      whiteRookQueenside: false,
-      blackRookKingside: false,
-      blackRookQueenside: false
-    };
-    this.turnIndicator.textContent = "White's turn";
-    this.statusMessage.textContent = "";
-    this.clearHighlights();
-    this.updateBoardView();
   }
 }
 
