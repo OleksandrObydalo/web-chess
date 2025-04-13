@@ -46,6 +46,9 @@ class ChessGame {
     
     this.initBoard();
     this.setupEventListeners();
+    
+    // Initialize attack visualizer after board is set up
+    this.attackVisualizer = new AttackVisualizer(this);
   }
 
   createInitialBoard() {
@@ -564,6 +567,11 @@ class ChessGame {
     const movingPiece = this.board[startRow][startCol];
     const capturedPiece = this.board[endRow][endCol];
     
+    // Create a deep copy of the current board state before making the move
+    const boardStateCopy = this.board.map(row => row.map(piece => 
+      piece ? {...piece} : null
+    ));
+    
     // Check for castling move
     if (movingPiece.type === 'KING') {
       // Update king moved status
@@ -625,7 +633,7 @@ class ChessGame {
     // Check if the opponent is in check or checkmate
     this.checkGameState();
     
-    // Record the move in move history
+    // Record the move in move history with board state
     this.moveHistory.addMove({
       startRow, 
       startCol, 
@@ -633,25 +641,79 @@ class ChessGame {
       endCol,
       piece: PIECES[movingPiece.color][movingPiece.type],
       capturedPiece: capturedPiece ? PIECES[capturedPiece.color][capturedPiece.type] : null
-    });
+    }, boardStateCopy);
+    
+    // Refresh attack visualization after move
+    if (this.attackVisualizer) {
+      this.attackVisualizer.refreshVisualization();
+    }
   }
 
-  restoreGameFromHistory(moves) {
-    // Reset the game to initial state
-    this.resetGame();
+  restoreGameFromHistory(boardState) {
+    // Deep copy the board state to avoid reference issues
+    this.board = boardState.map(row => row.map(piece => 
+      piece ? {...piece} : null
+    ));
 
-    // Replay moves up to the specified point
-    for (const move of moves) {
-      this.board[move.endRow][move.endCol] = this.board[move.startRow][move.startCol];
-      this.board[move.startRow][move.startCol] = null;
-      
-      // Switch players
-      this.currentPlayer = this.currentPlayer === 'WHITE' ? 'BLACK' : 'WHITE';
-    }
+    // Reset piece moved tracking based on the restored board state
+    this.resetPieceMovedTracking(boardState);
 
+    // Update the current player based on move count
+    this.currentPlayer = this.moveHistory.currentMoveIndex % 2 === 0 ? 'WHITE' : 'BLACK';
+  
     // Update the board view
     this.updateBoardView();
     this.turnIndicator.textContent = `${this.currentPlayer.charAt(0) + this.currentPlayer.slice(1).toLowerCase()}'s turn`;
+  
+    // Reset game state checks
+    this.selectedPiece = null;
+    this.possibleMoves = [];
+    this.checkGameState();
+    
+    // Refresh attack visualization after board state change
+    if (this.attackVisualizer) {
+      this.attackVisualizer.refreshVisualization();
+    }
+  }
+
+  resetPieceMovedTracking(boardState) {
+    const initialConfig = {
+      whiteKing: false,
+      blackKing: false,
+      whiteRookKingside: false,
+      whiteRookQueenside: false,
+      blackRookKingside: false,
+      blackRookQueenside: false
+    };
+
+    // Check king and rook positions
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const piece = boardState[row][col];
+        if (piece) {
+          switch(piece.type) {
+            case 'KING':
+              if (piece.color === 'WHITE') {
+                initialConfig.whiteKing = row !== 7 || col !== 4;
+              } else {
+                initialConfig.blackKing = row !== 0 || col !== 4;
+              }
+              break;
+            case 'ROOK':
+              if (piece.color === 'WHITE') {
+                if (row === 7 && col === 0) initialConfig.whiteRookQueenside = true;
+                if (row === 7 && col === 7) initialConfig.whiteRookKingside = true;
+              } else {
+                if (row === 0 && col === 0) initialConfig.blackRookQueenside = true;
+                if (row === 0 && col === 7) initialConfig.blackRookKingside = true;
+              }
+              break;
+          }
+        }
+      }
+    }
+
+    this.pieceMoved = initialConfig;
   }
 
   resetGame() {
@@ -677,6 +739,17 @@ class ChessGame {
     this.statusMessage.textContent = "";
     this.clearHighlights();
     this.updateBoardView();
+    
+    // Add initial board state to move history
+    const initialBoardState = this.board.map(row => row.map(piece => 
+      piece ? {...piece} : null
+    ));
+    this.moveHistory.addMove(null, initialBoardState);
+    
+    // Refresh attack visualization after reset
+    if (this.attackVisualizer) {
+      this.attackVisualizer.refreshVisualization();
+    }
   }
 
   checkGameState() {

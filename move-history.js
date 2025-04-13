@@ -1,5 +1,6 @@
 class MoveHistory {
   constructor() {
+    this.boardStates = [];
     this.moves = [];
     this.currentMoveIndex = -1;
     this.moveHistoryElement = document.getElementById('move-history');
@@ -14,13 +15,15 @@ class MoveHistory {
     this.nextMoveButton.addEventListener('click', () => this.goToNextMove());
   }
 
-  addMove(move) {
+  addMove(move, boardState) {
     // If we're not at the end of the move list, truncate it
     if (this.currentMoveIndex < this.moves.length - 1) {
       this.moves = this.moves.slice(0, this.currentMoveIndex + 1);
+      this.boardStates = this.boardStates.slice(0, this.currentMoveIndex + 1);
     }
     
     this.moves.push(move);
+    this.boardStates.push(boardState);
     this.currentMoveIndex++;
     this.updateMoveHistoryView();
   }
@@ -31,7 +34,7 @@ class MoveHistory {
     
     this.moves.forEach((move, index) => {
       const moveItem = document.createElement('li');
-      moveItem.textContent = this.formatMoveNotation(move);
+      moveItem.textContent = move ? this.formatMoveNotation(move) : 'Initial Position';
       
       if (index === this.currentMoveIndex) {
         moveItem.classList.add('current-move');
@@ -45,7 +48,7 @@ class MoveHistory {
     this.moveHistoryElement.appendChild(moveList);
     
     // Update navigation button states
-    this.prevMoveButton.disabled = this.currentMoveIndex <= -1;
+    this.prevMoveButton.disabled = this.currentMoveIndex <= 0;
     this.nextMoveButton.disabled = this.currentMoveIndex >= this.moves.length - 1;
   }
 
@@ -62,7 +65,7 @@ class MoveHistory {
   }
 
   goToPreviousMove() {
-    if (this.currentMoveIndex > -1) {
+    if (this.currentMoveIndex > 0) {
       this.currentMoveIndex--;
       this.restoreGameState();
     }
@@ -83,13 +86,15 @@ class MoveHistory {
   restoreGameState() {
     // This method will be set by the ChessGame class to restore the game state
     if (this.onRestoreState) {
-      this.onRestoreState(this.moves.slice(0, this.currentMoveIndex + 1));
+      // Pass the board state corresponding to the current move index
+      this.onRestoreState(this.boardStates[this.currentMoveIndex]);
     }
     this.updateMoveHistoryView();
   }
 
   reset() {
     this.moves = [];
+    this.boardStates = [];
     this.currentMoveIndex = -1;
     this.updateMoveHistoryView();
   }

@@ -149,3 +149,55 @@ button:hover {
   background-color: #c0c0c0;
   font-weight: bold;
 }
+
+/* New styles for attack visualization */
+.attacking {
+  box-shadow: inset 0 0 0 3px #ff5722;
+}
+
+.attacked {
+  box-shadow: inset 0 0 0 3px #e91e63;
+}
+
+.both-statuses {
+  box-shadow: inset 0 0 0 3px #9c27b0;
+}
+
+.attack-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #f1f1f1;
+  border-radius: 5px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+}
+
+.legend-color {
+  width: 15px;
+  height: 15px;
+  margin-right: 5px;
+  border-radius: 2px;
+}
+
+.color-attacking {
+  background-color: #ff5722;
+}
+
+.color-attacked {
+  background-color: #e91e63;
+}
+
+.color-both {
+  background-color: #9c27b0;
+}
+
+#show-attacks-btn.active {
+  background-color: #f44336;
+}
